@@ -1,0 +1,21 @@
+{
+  "name": "cypress-ui-automation",
+  "version": "1.0.0",
+  "description": "Production-grade Cypress E2E UI automation framework for Sauce Demo using Page Object Model",
+  "author": "Bhuvesh Yadav <https://github.com/bhuvesh75>",
+  "license": "MIT",
+  "scripts": {
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "cy:smoke": "cypress run --spec 'cypress/e2e/smoke/**/*.cy.js'",
+    "cy:functional": "cypress run --spec 'cypress/e2e/functional/**/*.cy.js'",
+    "cy:regression": "cypress run --spec 'cypress/e2e/regression/**/*.cy.js'",
+    "cy:report": "mochawesome-merge cypress/reports/*.json > cypress/reports/combined.json && marge cypress/reports/combined.json -o cypress/reports/html"
+  },
+  "devDependencies": {
+    "cypress": "13.10.0",
+    "mochawesome": "7.1.3",
+    "mochawesome-merge": "4.3.0",
+    "mochawesome-report-generator": "6.2.0"
+  }
+}
