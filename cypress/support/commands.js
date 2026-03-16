@@ -20,38 +20,42 @@
  */
 Cypress.Commands.add('login', (username, password) => {
   // WHY: cy.session() with cacheAcrossSpecs: true caches the authenticated
-  // browser state once per run. Without it, every test does a fresh login
-  // by visiting saucedemo.com, and saucedemo.com's CDN rate-limits consecutive
-  // requests from GitHub Actions IPs — causing 120s timeouts.
+  // browser state ONCE per entire cypress run. On every subsequent call in
+  // the same run, Cypress restores the saved localStorage/cookies without
+  // re-running the setup function — so saucedemo.com is visited only ONCE
+  // to create the session, not once per test.
   cy.session([username, password], () => {
-    // Full login flow — runs once per run, then cached
+    // Full login flow — runs ONCE per cypress run, then the session state
+    // (localStorage containing 'session-username') is cached to disk.
     cy.visit('/');
     cy.get('#user-name').clear().type(username);
     cy.get('#password').clear().type(password);
     cy.get('#login-button').click();
-    // Wait for navigation to confirm login succeeded before caching session
+    // Confirm the login succeeded before caching the session state.
     cy.url().should('include', '/inventory.html');
   }, {
     cacheAcrossSpecs: true,
-    validate() {
-      // WHY: validate() replaces the outer cy.visit('/') that previously sat
-      // after cy.session(). The old design caused two back-to-back CDN requests
-      // on session CREATION: one inside the setup function, and one immediately
-      // after cy.session() returned — triggering saucedemo.com's CDN rate limit
-      // from GitHub Actions IPs and causing 120s pageLoadTimeout failures.
-      // Moving the navigation here fixes it: during session creation the setup's
-      // cy.visit('/') populates the browser cache (Cache-Control: max-age=600);
-      // validate then runs cy.visit('/') against that same cache — a cache hit,
-      // no second CDN request. On subsequent session restores the cache is still
-      // warm (within the same spec, testIsolation:false preserves it), so
-      // validate also hits the cache. After validate succeeds, Cypress leaves
-      // the browser on /inventory.html, so no outer cy.visit() is needed at all.
-      cy.visit('/');
-      cy.url().should('include', '/inventory.html');
-    },
+    // WHY: No validate() callback. The previous design called cy.visit('/')
+    // inside validate(), which runs on EVERY cy.session() call after restoring
+    // the cached session. With 6 spec files and multiple beforeEach calls per
+    // spec, validate() triggered many rapid cy.visit('/') requests to
+    // saucedemo.com. saucedemo.com's CDN rate-limits consecutive page-load
+    // requests from GitHub Actions IPs and returns 404 / connection refused
+    // within the rate-limit window, causing 120s pageLoadTimeout failures.
+    // When validate() timed out, Cypress invalidated the cached session and
+    // re-ran setup(), causing ANOTHER cy.visit('/') — doubling the CDN hits
+    // and compounding the rate-limit cascade. Removing validate() means
+    // Cypress trusts the restored localStorage state without any additional
+    // CDN requests. The cy.visit('/inventory.html') below then handles the
+    // single navigation needed to land the test on the correct page.
   });
-  // WHY: No cy.visit('/') here — validate() handles navigation to inventory
-  // and the browser is already on /inventory.html when cy.session() returns.
+  // WHY: Navigate to the inventory page after session setup or restore.
+  // With testIsolation:false, the browser's HTTP cache persists between tests
+  // within the same spec (saucedemo.com serves with Cache-Control: max-age=600).
+  // Only the FIRST test per spec file makes a live CDN request for
+  // /inventory.html; all subsequent tests in the same spec hit the cache.
+  // This gives at most 1 CDN request per spec file — well within the rate limit.
+  cy.visit('/inventory.html');
 });
 
 /**

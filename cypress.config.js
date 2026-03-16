@@ -105,8 +105,8 @@ module.exports = defineConfig({
      * browser cache with no CDN request — eliminating rate-limit timeouts.
      * Each spec's FIRST test still makes one cold CDN request (which resets
      * between specs due to natural inter-spec delays).
-     * Cart/auth state contamination is prevented by cy.clearLocalStorage() in
-     * cy.login() before each cy.session() call.
+     * Cart/auth state contamination is prevented by cy.session() restoring
+     * the original login-state localStorage on every cy.login() call.
      */
     testIsolation: false,
 
